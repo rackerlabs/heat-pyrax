@@ -1,4 +1,5 @@
 # Copyright 2010 Jacob Kaplan-Moss
+import collections
 
 # Copyright 2011 OpenStack LLC.
 # Copyright (c)2012 Rackspace US, Inc.
@@ -171,7 +172,8 @@ class BaseManager(object):
         listing responses the same way, so overriding this method allows
         subclasses to handle extraction for those outliers.
         """
-        if self.plural_response_key is None:
+        # occasionally, its just a list (rackconnect for example)
+        if isinstance(resp_body, list):
             return resp_body
         if key:
             data = resp_body.get(key)
