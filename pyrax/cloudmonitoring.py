@@ -377,23 +377,39 @@ class CloudMonitorNotificationPlanManager(_PaginationManager):
         """
         uri = "/%s" % self.uri_base
         body = {"label": label or name}
+        body.update(self._make_notification_args(critical_state, ok_state,
+                                                 warning_state))
+        resp = self.api.method_post(uri, body=body)[0]
+        return self.get(resp.headers["x-object-id"])
+
+    def update(self, plan, label=None, critical_state=None, ok_state=None,
+               warning_state=None):
+
+        uri = "/%s/%s" % (self.uri_base, utils.get_id(plan))
+        body = {}
+        if label is not None:
+            body['label'] = label
+        body.update(self._make_notification_args(critical_state, ok_state,
+                                                 warning_state))
+        self.api.method_put(uri, body=body)
+        return self.get(plan)
+
+    def _make_notification_args(self, critical_state=None, ok_state=None,
+                                warning_state=None):  
 
         def make_list_of_ids(parameter):
             params = utils.coerce_to_list(parameter)
             return [utils.get_id(param) for param in params]
 
+        body = {}
+
         if critical_state:
-            critical_state = utils.coerce_to_list(critical_state)
             body["critical_state"] = make_list_of_ids(critical_state)
         if warning_state:
-            warning_state = utils.coerce_to_list(warning_state)
             body["warning_state"] = make_list_of_ids(warning_state)
         if ok_state:
-            ok_state = utils.coerce_to_list(ok_state)
             body["ok_state"] = make_list_of_ids(ok_state)
-        resp, resp_body = self.api.method_post(uri, body=body)
-        return self.get(resp.headers["x-object-id"])
-
+        return body
 
 
 class CloudMonitorMetricsManager(_PaginationManager):
@@ -1298,6 +1314,13 @@ class CloudMonitorClient(BaseClient):
         Returns the CloudMonitorNotificationPlan object for the specified ID.
         """
         return self._notification_plan_manager.get(notification_plan_id)
+
+    def update_notification_plan(self, plan, label=None, name=None,
+            critical_state=None, ok_state=None, warning_state=None):
+
+        return self._notification_plan_manager.update(plan, label=label,
+            critical_state=critical_state, ok_state=ok_state,
+            warning_state=warning_state)
 
 
     def delete_notification_plan(self, notification_plan):
