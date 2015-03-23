@@ -61,6 +61,7 @@ try:
     from novaclient.v1_1.servers import Server as CloudServer
 
     from .autoscale import AutoScaleClient
+    from .cloudcdn import CloudCDNClient
     from .clouddatabases import CloudDatabaseClient
     from .cloudloadbalancers import CloudLoadBalancerClient
     from .cloudblockstorage import CloudBlockStorageClient
@@ -85,6 +86,7 @@ except ImportError:
 # Initiate the services to None until we are authenticated.
 cloudservers = None
 cloudfiles = None
+cloud_cdn = None
 cloud_loadbalancers = None
 cloud_databases = None
 cloud_blockstorage = None
@@ -117,6 +119,7 @@ services = tuple()
 
 _client_classes = {
         "compute": _cs_client.Client,
+        "cdn": CloudCDNClient,
         "object_store": StorageClient,
         "database": CloudDatabaseClient,
         "load_balancer": CloudLoadBalancerClient,
@@ -581,7 +584,7 @@ def authenticate(connect=True):
 
 def clear_credentials():
     """De-authenticate by clearing all the names back to None."""
-    global identity, regions, services, cloudservers, cloudfiles
+    global identity, regions, services, cloudservers, cloudfiles, cloud_cdn
     global cloud_loadbalancers, cloud_databases, cloud_blockstorage, cloud_dns
     global cloud_networks, cloud_monitoring, autoscale, images, queues
     global rackconnect
@@ -590,6 +593,7 @@ def clear_credentials():
     services = tuple()
     cloudservers = None
     cloudfiles = None
+    cloud_cdn = None
     cloud_loadbalancers = None
     cloud_databases = None
     cloud_blockstorage = None
@@ -617,9 +621,11 @@ def connect_to_services(region=None):
     """Establishes authenticated connections to the various cloud APIs."""
     global cloudservers, cloudfiles, cloud_loadbalancers, cloud_databases
     global cloud_blockstorage, cloud_dns, cloud_networks, cloud_monitoring
-    global autoscale, images, queues, rackconnect
+    global autoscale, images, queues, cloud_cdn
+    global rackconnect
     cloudservers = connect_to_cloudservers(region=region)
     cloudfiles = connect_to_cloudfiles(region=region)
+    cloud_cdn = connect_to_cloud_cdn(region=region)
     cloud_loadbalancers = connect_to_cloud_loadbalancers(region=region)
     cloud_databases = connect_to_cloud_databases(region=region)
     cloud_blockstorage = connect_to_cloud_blockstorage(region=region)
@@ -651,7 +657,7 @@ def _get_service_endpoint(context, svc, region=None, public=True):
     return ep
 
 
-def connect_to_cloudservers(region=None, context=None, **kwargs):
+def connect_to_cloudservers(region=None, context=None, verify_ssl=None, **kwargs):
     """Creates a client for working with cloud servers."""
     context = context or identity
     _cs_auth_plugin.discover_auth_systems()
@@ -666,7 +672,10 @@ def connect_to_cloudservers(region=None, context=None, **kwargs):
     if not mgt_url:
         # Service is not available
         return
-    insecure = not get_setting("verify_ssl")
+    if verify_ssl is None:
+        insecure = not get_setting("verify_ssl")
+    else:
+        insecure = not verify_ssl
     cs_shell = _cs_shell()
     extensions = cs_shell._discover_extensions("1.1")
     cloudservers = _cs_client.Client(context.username, context.password,
@@ -734,13 +743,14 @@ def connect_to_cloudfiles(region=None, public=None):
 
 
 @_require_auth
-def _create_client(ep_name, region, public=True):
+def _create_client(ep_name, region, public=True, verify_ssl=None):
     region = _safe_region(region)
     ep = _get_service_endpoint(None, ep_name.split(":")[0], region,
             public=public)
     if not ep:
         return
-    verify_ssl = get_setting("verify_ssl")
+    if verify_ssl is None:
+        verify_ssl = get_setting("verify_ssl")
     cls = _client_classes[ep_name]
     client = cls(identity, region_name=region, management_url=ep,
             verify_ssl=verify_ssl, http_log_debug=_http_debug)
@@ -751,6 +761,11 @@ def _create_client(ep_name, region, public=True):
 def connect_to_cloud_databases(region=None):
     """Creates a client for working with cloud databases."""
     return _create_client(ep_name="database", region=region)
+
+
+def connect_to_cloud_cdn(region=None):
+    """Creates a client for working with cloud loadbalancers."""
+    return _create_client(ep_name="cdn", region=region)
 
 
 def connect_to_cloud_loadbalancers(region=None):
