@@ -681,7 +681,7 @@ def connect_to_cloudservers(region=None, context=None, verify_ssl=None, **kwargs
             project_id=context.tenant_id, auth_url=context.auth_endpoint,
             auth_system=id_type, region_name=region, service_type="compute",
             auth_plugin=auth_plugin, insecure=insecure, extensions=extensions,
-            http_log_debug=_http_debug, **kwargs)
+            http_log_debug=_http_debug, direct_use=False, **kwargs)
     agt = cloudservers.client.USER_AGENT
     cloudservers.client.USER_AGENT = _make_agent_name(agt)
     cloudservers.client.management_url = mgt_url
