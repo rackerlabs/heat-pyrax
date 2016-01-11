@@ -8,9 +8,12 @@ import fnmatch
 import hashlib
 import numbers
 import os
+import pyrax
+import pyrax.exceptions as exc
 import random
 import re
 import shutil
+import six
 import string
 from subprocess import Popen, PIPE
 import sys
@@ -25,11 +28,6 @@ try:
 except ImportError:
     import pdb as pudb
 trace = pudb.set_trace
-
-import six
-
-import pyrax
-import pyrax.exceptions as exc
 
 
 SLUGIFY_STRIP_RE = re.compile(r"[^\w\s-]")

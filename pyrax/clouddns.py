@@ -26,6 +26,7 @@ import six
 import pyrax
 from pyrax.client import BaseClient
 from pyrax.cloudloadbalancers import CloudLoadBalancer
+from novaclient.v2.servers import Server
 import pyrax.exceptions as exc
 from pyrax.manager import BaseManager
 from pyrax.resource import BaseResource
@@ -928,12 +929,12 @@ class CloudDNSManager(BaseManager):
         """
         try:
             from tests.unit import fakes
-            server_types = (pyrax.CloudServer, fakes.FakeServer)
+            server_types = (Server, fakes.FakeServer)
             lb_types = (CloudLoadBalancer, fakes.FakeLoadBalancer,
                     fakes.FakeDNSDevice)
         except ImportError:
             # Not running with tests
-            server_types = (pyrax.CloudServer, )
+            server_types = (Server, )
             lb_types = (CloudLoadBalancer, )
         if isinstance(device, server_types):
             device_type = "server"

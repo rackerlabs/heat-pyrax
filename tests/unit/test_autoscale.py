@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import base64
 import random
 import unittest
 
@@ -671,7 +672,7 @@ class AutoscaleTest(unittest.TestCase):
         metadata = utils.random_unicode()
         personality = utils.random_unicode()
         networks = utils.random_unicode()
-        userdata = utils.random_unicode()
+        userdata = utils.random_ascii()
         config_drive = utils.random_unicode()
         sg.launchConfiguration = {
                 "type": typ,
@@ -702,7 +703,7 @@ class AutoscaleTest(unittest.TestCase):
                         "name": new_name,
                         "imageRef": new_img,
                         "flavorRef": new_flv,
-                        "user_data": userdata,
+                        "user_data": base64.b64encode(userdata),
                         "config_drive": config_drive,
                         },
                     "loadBalancers": []

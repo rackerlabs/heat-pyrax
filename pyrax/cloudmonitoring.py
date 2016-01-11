@@ -395,7 +395,7 @@ class CloudMonitorNotificationPlanManager(_PaginationManager):
         return self.get(plan)
 
     def _make_notification_args(self, critical_state=None, ok_state=None,
-                                warning_state=None):  
+                                warning_state=None):
 
         def make_list_of_ids(parameter):
             params = utils.coerce_to_list(parameter)
