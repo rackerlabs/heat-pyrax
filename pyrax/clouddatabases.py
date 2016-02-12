@@ -877,6 +877,9 @@ class CloudDatabaseClient(BaseClient):
     def update_schedule(self, schedule, day_of_week=None, hour=None,
                         minute=None, full_backup_retention=None,
                         backup_now=False, run_now=False):
+        if not schedule:
+            raise exc.ClientException(code=400,
+                message="Must specify a schedule to update.")
         self._schedule_manager.update(schedule, day_of_week=day_of_week,
             hour=hour, minute=minute, run_now=run_now,
             full_backup_retention=full_backup_retention)
