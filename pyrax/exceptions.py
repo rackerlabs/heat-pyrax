@@ -348,6 +348,7 @@ class VolumeDetachmentFailed(PyraxException):
 
 class VolumeNotAvailable(PyraxException):
     pass
+
 class MissingCloudDatabaseParameter(PyraxException):
     pass
 

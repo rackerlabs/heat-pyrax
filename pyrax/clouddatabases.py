@@ -25,6 +25,7 @@ import pyrax.exceptions as exc
 from pyrax.manager import BaseManager
 from pyrax.resource import BaseResource
 import pyrax.utils as utils
+from webob.datetime_utils import minute
 
 
 def assure_instance(fnc):
@@ -672,6 +673,60 @@ class CloudDatabaseBackup(BaseResource):
     _non_display = ["locationRef"]
 
 
+class CloudDatabaseSchedule(BaseResource):
+    """
+    This class represents a scheduled backup
+    """
+    get_details = True
+
+
+class CloudDatabaseScheduleManager(BaseManager):
+
+    def __init__(self, api):
+        super(CloudDatabaseScheduleManager, self).__init__(api,
+            resource_class=CloudDatabaseSchedule,
+            response_key="schedule",
+            uri_base="schedules")
+
+    def _create_body(self, name, instance, action="backup", day_of_week=0,
+                     hour=0, minute=0, source_type='instance',
+                     full_backup_retention=2):
+        if instance is None:
+            raise exc.ClientException(code=400,
+                message="You must specify an instance or ha instance to "
+                        "create a schedule for.")
+        return {
+            "schedule": {
+                "action": action,
+                "day_of_week": day_of_week,
+                "hour": hour,
+                "minute": minute,
+                "source_id": utils.get_id(instance),
+                "source_type": source_type,
+                "full_backup_retention": full_backup_retention
+            }
+        }
+
+    def update(self, schedule, day_of_week=None, hour=None, minute=None,
+               run_now=False, full_backup_retention=None):
+        if schedule is None:
+            raise exc.ClientException(code=400,
+                message="Must provide a schedule to modify.")
+        uri = "/%s/%s" % (self.uri_base, utils.get_id(schedule))
+        sched = {}
+        if day_of_week:
+            sched['day_of_week'] = day_of_week
+        if hour:
+            sched['hour'] = hour
+        if minute:
+            sched['minute'] = minute
+        if run_now:
+            sched['run_now'] = run_now
+        if full_backup_retention:
+            sched['full_backup_retention'] = full_backup_retention
+        if sched:
+            self._update(uri, {"schedule": sched})
+
 
 class CloudDatabaseClient(BaseClient):
     """
@@ -693,6 +748,7 @@ class CloudDatabaseClient(BaseClient):
         self._backup_manager = CloudDatabaseBackupManager(self,
                 resource_class=CloudDatabaseBackup, response_key="backup",
                 uri_base="backups")
+        self._schedule_manager = CloudDatabaseScheduleManager(self)
 
 
     @assure_instance
@@ -805,6 +861,33 @@ class CloudDatabaseClient(BaseClient):
         """
         return instance.revoke_user_access(user, db_names, strict=strict)
 
+    def list_schedules(self, limit=None, marker=None):
+        return self._schedule_manager.list(limit=limit, marker=marker)
+
+    def get_schedule(self, schedule_id):
+        return self._schedule_manager.get(schedule_id)
+
+    @assure_instance
+    def create_schedule(self, instance, action="backup", day_of_week=0,
+                        hour=0, minute=0, source_type='instance',
+                        full_backup_retention=2):
+        return self._schedule_manager.create(None, instance, action=action,
+            day_of_week=day_of_week, hour=hour, minute=minute,
+            source_type=source_type,
+            full_backup_retention=full_backup_retention)
+
+    def update_schedule(self, schedule, day_of_week=None, hour=None,
+                        minute=None, full_backup_retention=None,
+                        backup_now=False, run_now=False):
+        self._schedule_manager.update(schedule, day_of_week=day_of_week,
+            hour=hour, minute=minute, run_now=run_now,
+            full_backup_retention=full_backup_retention)
+
+    def delete_schedule(self, schedule):
+        if not schedule:
+            raise exc.ClientException(code=400,
+                message="Must specify a schedule to delete.")
+        return self._schedule_manager.delete(schedule)
 
     @assure_instance
     def enable_root_user(self, instance):
