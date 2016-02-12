@@ -102,7 +102,7 @@ class AutoscaleTest(unittest.TestCase):
         sg.get_launch_config()
         mgr.get_launch_config.assert_called_once_with(sg)
 
-    def test_update_launch_config(self):
+    def test_update_launch_config_server(self):
         sg = self.scaling_group
         mgr = sg.manager
         mgr.update_launch_config = Mock()
@@ -117,17 +117,48 @@ class AutoscaleTest(unittest.TestCase):
         key_name = utils.random_unicode()
         config_drive = utils.random_unicode()
         user_data = utils.random_unicode()
-        sg.update_launch_config(server_name=server_name, flavor=flavor,
-                image=image, disk_config=disk_config, metadata=metadata,
-                personality=personality, networks=networks,
-                load_balancers=load_balancers, key_name=key_name,
-                config_drive=config_drive, user_data=user_data)
-        mgr.update_launch_config.assert_called_once_with(sg,
-                server_name=server_name, flavor=flavor, image=image,
-                disk_config=disk_config, metadata=metadata,
-                personality=personality, networks=networks,
-                load_balancers=load_balancers, key_name=key_name,
-                config_drive=config_drive, user_data=user_data)
+        sg.update_launch_config(sg, 'launch_server',
+                                server_name=server_name,
+                                flavor=flavor, image=image,
+                                disk_config=disk_config,
+                                metadata=metadata,
+                                personality=personality,
+                                networks=networks,
+                                load_balancers=load_balancers,
+                                key_name=key_name,
+                                config_drive=config_drive,
+                                user_data=user_data)
+        mgr.update_launch_config.assert_called_once_with(
+            sg, 'launch_server', server_name=server_name, flavor=flavor,
+            image=image, disk_config=disk_config, metadata=metadata,
+            personality=personality, networks=networks,
+            load_balancers=load_balancers, key_name=key_name,
+            config_drive=config_drive, user_data=user_data)
+
+    def test_update_launch_config_stack(self):
+        sg = self.scaling_group
+        mgr = sg.manager
+        mgr.update_launch_config = Mock()
+        template = utils.random_unicode()
+        template_url = utils.random_unicode()
+        disable_rollback = utils.random_unicode()
+        environment = utils.random_unicode()
+        files = utils.random_unicode()
+        parameters = utils.random_unicode()
+        timeout_mins = utils.random_unicode()
+        sg.update_launch_config(sg, 'launch_stack', template=template,
+                                template_url=template_url,
+                                disable_rollback=disable_rollback,
+                                environment=environment, files=files,
+                                parameters=parameters,
+                                timeout_mins=timeout_mins)
+        mgr.update_launch_config.assert_called_once_with(
+            sg, 'launch_stack', template=template,
+            template_url=template_url,
+            disable_rollback=disable_rollback,
+            environment=environment, files=files,
+            parameters=parameters,
+            timeout_mins=timeout_mins)
 
     def test_update_launch_metadata(self):
         sg = self.scaling_group
@@ -423,10 +454,9 @@ class AutoscaleTest(unittest.TestCase):
         mgr.update_metadata(sg.id, metadata)
         mgr.update.assert_called_once_with(sg, metadata=expected)
 
-    def test_mgr_get_launch_config(self):
+    def test_mgr_get_launch_config_server(self):
         sg = self.scaling_group
         mgr = sg.manager
-        typ = utils.random_unicode()
         lbs = utils.random_unicode()
         name = utils.random_unicode()
         flv = utils.random_unicode()
@@ -437,7 +467,7 @@ class AutoscaleTest(unittest.TestCase):
         networks = utils.random_unicode()
         key_name = utils.random_unicode()
         launchdict = {"launchConfiguration":
-                {"type": typ,
+                {"type": "launch_server",
                 "args": {
                     "loadBalancers": lbs,
                     "server": {
@@ -454,28 +484,72 @@ class AutoscaleTest(unittest.TestCase):
                 },
             }
         expected = {
-                "type": typ,
-                "load_balancers": lbs,
-                "name": name,
-                "flavor": flv,
-                "image": img,
-                "disk_config": dconfig,
-                "metadata": metadata,
-                "personality": personality,
-                "networks": networks,
-                "key_name": key_name,
+                "type": "launch_server",
+                "args": {
+                    "load_balancers": lbs,
+                    "name": name,
+                    "flavor": flv,
+                    "image": img,
+                    "disk_config": dconfig,
+                    "metadata": metadata,
+                    "personality": personality,
+                    "networks": networks,
+                    "key_name": key_name
                 }
+        }
         mgr.api.method_get = Mock(return_value=(None, launchdict))
         uri = "/%s/%s/launch" % (mgr.uri_base, sg.id)
         ret = mgr.get_launch_config(sg)
         mgr.api.method_get.assert_called_once_with(uri)
         self.assertEqual(ret, expected)
 
-    def test_mgr_update_launch_config(self):
+    def test_mgr_get_launch_config_stack(self):
+        sg = self.scaling_group
+        mgr = sg.manager
+        template = utils.random_unicode()
+        template_url = utils.random_unicode()
+        disable_rollback = utils.random_unicode()
+        environment = utils.random_unicode()
+        files = utils.random_unicode()
+        parameters = utils.random_unicode()
+        timeout_mins = utils.random_unicode()
+        launchdict = {"launchConfiguration":
+                {"type": "launch_stack",
+                "args": {
+                    "stack": {
+                        "template": template,
+                        "template_url": template_url,
+                        "disable_rollback": disable_rollback,
+                        "environment": environment,
+                        "files": files,
+                        "parameters": parameters,
+                        "timeout_mins": timeout_mins,
+                        },
+                    },
+                },
+            }
+        expected = {
+                "type": "launch_stack",
+                "args": {
+                    "template": template,
+                    "template_url": template_url,
+                    "disable_rollback": disable_rollback,
+                    "environment": environment,
+                    "files": files,
+                    "parameters": parameters,
+                    "timeout_mins": timeout_mins,
+                }
+        }
+        mgr.api.method_get = Mock(return_value=(None, launchdict))
+        uri = "/%s/%s/launch" % (mgr.uri_base, sg.id)
+        ret = mgr.get_launch_config(sg)
+        mgr.api.method_get.assert_called_once_with(uri)
+        self.assertEqual(ret, expected)
+
+    def test_mgr_update_launch_config_server(self):
         sg = self.scaling_group
         mgr = sg.manager
         mgr.get = Mock(return_value=sg)
-        typ = utils.random_unicode()
         lbs = utils.random_unicode()
         name = utils.random_unicode()
         flv = utils.random_unicode()
@@ -501,16 +575,53 @@ class AutoscaleTest(unittest.TestCase):
             }
         mgr.api.method_put = Mock(return_value=(None, None))
         uri = "/%s/%s/launch" % (mgr.uri_base, sg.id)
-        mgr.update_launch_config(sg.id, server_name=name, flavor=flv, image=img,
-                disk_config=dconfig, metadata=metadata,
-                personality=personality, networks=networks, load_balancers=lbs)
+        mgr.update_launch_config(sg, "launch_server",
+                                 server_name=name, flavor=flv, image=img,
+                                 disk_config=dconfig, metadata=metadata,
+                                 personality=personality, networks=networks,
+                                 load_balancers=lbs)
         mgr.api.method_put.assert_called_once_with(uri, body=body)
 
-    def test_mgr_update_launch_config_unset_personality(self):
+    def test_mgr_update_launch_config_stack(self):
         sg = self.scaling_group
         mgr = sg.manager
         mgr.get = Mock(return_value=sg)
-        typ = utils.random_unicode()
+        template = utils.random_unicode()
+        template_url = utils.random_unicode()
+        disable_rollback = utils.random_unicode()
+        environment = utils.random_unicode()
+        files = utils.random_unicode()
+        parameters = utils.random_unicode()
+        timeout_mins = utils.random_unicode()
+        sg.launchConfiguration = {}
+        body = {"type": "launch_stack",
+                "args": {
+                    "stack": {
+                        "template": template,
+                        "template_url": template_url,
+                        "disable_rollback": disable_rollback,
+                        "environment": environment,
+                        "files": files,
+                        "parameters": parameters,
+                        "timeout_mins": timeout_mins,
+                    }
+                },
+            }
+        mgr.api.method_put = Mock(return_value=(None, None))
+        uri = "/%s/%s/launch" % (mgr.uri_base, sg.id)
+        mgr.update_launch_config(sg, "launch_stack",
+                                 template=template,
+                                 template_url=template_url,
+                                 disable_rollback=disable_rollback,
+                                 environment=environment, files=files,
+                                 parameters=parameters,
+                                 timeout_mins=timeout_mins)
+        mgr.api.method_put.assert_called_once_with(uri, body=body)
+
+    def test_mgr_update_launch_config_server_unset_personality(self):
+        sg = self.scaling_group
+        mgr = sg.manager
+        mgr.get = Mock(return_value=sg)
         lbs = utils.random_unicode()
         name = utils.random_unicode()
         flv = utils.random_unicode()
@@ -553,16 +664,16 @@ class AutoscaleTest(unittest.TestCase):
         }
         mgr.api.method_put = Mock(return_value=(None, None))
         uri = "/%s/%s/launch" % (mgr.uri_base, sg.id)
-        mgr.update_launch_config(sg.id, server_name=name, flavor=flv, image=img,
-                disk_config=dconfig, metadata=metadata,
-                personality=[], networks=networks, load_balancers=lbs)
+        mgr.update_launch_config(sg, "launch_server",
+                                 server_name=name, flavor=flv, image=img,
+                                 disk_config=dconfig, metadata=metadata,
+                                 personality=[], networks=networks, load_balancers=lbs)
         mgr.api.method_put.assert_called_once_with(uri, body=body)
 
-    def test_mgr_update_launch_config_no_personality(self):
+    def test_mgr_update_launch_config_server_no_personality(self):
         sg = self.scaling_group
         mgr = sg.manager
         mgr.get = Mock(return_value=sg)
-        typ = utils.random_unicode()
         lbs = utils.random_unicode()
         name = utils.random_unicode()
         flv = utils.random_unicode()
@@ -586,16 +697,16 @@ class AutoscaleTest(unittest.TestCase):
             }
         mgr.api.method_put = Mock(return_value=(None, None))
         uri = "/%s/%s/launch" % (mgr.uri_base, sg.id)
-        mgr.update_launch_config(sg.id, server_name=name, flavor=flv, image=img,
-                disk_config=dconfig, metadata=metadata,
-                networks=networks, load_balancers=lbs)
+        mgr.update_launch_config(sg, "launch_server",
+                                 server_name=name, flavor=flv, image=img,
+                                 disk_config=dconfig, metadata=metadata,
+                                 networks=networks, load_balancers=lbs)
         mgr.api.method_put.assert_called_once_with(uri, body=body)
 
-    def test_mgr_update_launch_config_no_metadata(self):
+    def test_mgr_update_launch_config_server_no_metadata(self):
         sg = self.scaling_group
         mgr = sg.manager
         mgr.get = Mock(return_value=sg)
-        typ = utils.random_unicode()
         lbs = utils.random_unicode()
         name = utils.random_unicode()
         flv = utils.random_unicode()
@@ -617,15 +728,16 @@ class AutoscaleTest(unittest.TestCase):
             }
         mgr.api.method_put = Mock(return_value=(None, None))
         uri = "/%s/%s/launch" % (mgr.uri_base, sg.id)
-        mgr.update_launch_config(sg.id, server_name=name, flavor=flv, image=img,
-                disk_config=dconfig, networks=networks, load_balancers=lbs)
+        mgr.update_launch_config(sg, "launch_server",
+                                 server_name=name, flavor=flv, image=img,
+                                 disk_config=dconfig, networks=networks,
+                                 load_balancers=lbs)
         mgr.api.method_put.assert_called_once_with(uri, body=body)
 
-    def test_mgr_update_launch_config_key_name(self):
+    def test_mgr_update_launch_config_server_key_name(self):
         sg = self.scaling_group
         mgr = sg.manager
         mgr.get = Mock(return_value=sg)
-        typ = utils.random_unicode()
         lbs = utils.random_unicode()
         name = utils.random_unicode()
         flv = utils.random_unicode()
@@ -653,17 +765,17 @@ class AutoscaleTest(unittest.TestCase):
             }
         mgr.api.method_put = Mock(return_value=(None, None))
         uri = "/%s/%s/launch" % (mgr.uri_base, sg.id)
-        mgr.update_launch_config(sg.id, server_name=name, flavor=flv, image=img,
-                disk_config=dconfig, metadata=metadata,
-                personality=personality, networks=networks, load_balancers=lbs,
-                key_name=key_name)
+        mgr.update_launch_config(sg, "launch_server",
+                                 server_name=name, flavor=flv, image=img,
+                                 disk_config=dconfig, metadata=metadata,
+                                 personality=personality, networks=networks,
+                                 load_balancers=lbs, key_name=key_name)
         mgr.api.method_put.assert_called_once_with(uri, body=body)
 
-    def test_mgr_replace_launch_config(self):
+    def test_mgr_replace_launch_config_server(self):
         sg = self.scaling_group
         mgr = sg.manager
         mgr.get = Mock(return_value=sg)
-        typ = utils.random_unicode()
         lbs = utils.random_unicode()
         name = utils.random_unicode()
         flv = utils.random_unicode()
@@ -675,7 +787,7 @@ class AutoscaleTest(unittest.TestCase):
         userdata = utils.random_ascii()
         config_drive = utils.random_unicode()
         sg.launchConfiguration = {
-                "type": typ,
+                "type": "launch_server",
                 "args": {
                     "server": {
                         "name": name,
@@ -691,13 +803,12 @@ class AutoscaleTest(unittest.TestCase):
                     "loadBalancers": lbs,
                     },
                 }
-        new_typ = utils.random_unicode()
         new_name = utils.random_unicode()
         new_flv = utils.random_unicode()
         new_img = utils.random_unicode()
 
         expected = {
-                "type": new_typ,
+                "type": "launch_server",
                 "args": {
                     "server": {
                         "name": new_name,
@@ -705,6 +816,7 @@ class AutoscaleTest(unittest.TestCase):
                         "flavorRef": new_flv,
                         "user_data": base64.b64encode(userdata),
                         "config_drive": config_drive,
+                        "metadata": {}
                         },
                     "loadBalancers": []
                     }
@@ -713,12 +825,68 @@ class AutoscaleTest(unittest.TestCase):
         mgr.api.method_put = Mock(return_value=(None, None))
         uri = "/%s/%s/launch" % (mgr.uri_base, sg.id)
 
-        mgr.replace_launch_config(sg.id, launch_config_type=new_typ,
+        mgr.replace_launch_config(sg, "launch_server",
                 server_name=new_name, flavor=new_flv, image=new_img,
                 user_data=userdata, config_drive=config_drive)
         mgr.api.method_put.assert_called_once_with(uri, body=expected)
 
-    def test_mgr_update_launch_metadata(self):
+    def test_mgr_replace_launch_config_stack(self):
+        sg = self.scaling_group
+        mgr = sg.manager
+        mgr.get = Mock(return_value=sg)
+        lbs = utils.random_unicode()
+        template = utils.random_unicode()
+        template_url = utils.random_unicode()
+        disable_rollback = utils.random_unicode()
+        environment = utils.random_unicode()
+        files = utils.random_unicode()
+        parameters = utils.random_unicode()
+        timeout_mins = utils.random_unicode()
+        sg.launchConfiguration = {
+                "type": "launch_stack",
+                "args": {
+                    "stack": {
+                        "template": template,
+                        "template_url": template_url,
+                        "disable_rollback": disable_rollback,
+                        "environment": environment,
+                        "files": files,
+                        "parameters": parameters,
+                        "timeout_mins": timeout_mins,
+                        },
+                }
+        }
+
+        new_template = utils.random_unicode()
+        new_files = utils.random_unicode()
+        expected = {
+                "type": "launch_stack",
+                "args": {
+                    "stack": {
+                        "template": new_template,
+                        "template_url": template_url,
+                        "disable_rollback": disable_rollback,
+                        "environment": environment,
+                        "files": new_files,
+                        "parameters": parameters,
+                        "timeout_mins": timeout_mins,
+                    }
+                }
+        }
+
+        mgr.api.method_put = Mock(return_value=(None, None))
+        uri = "/%s/%s/launch" % (mgr.uri_base, sg.id)
+
+        mgr.replace_launch_config(sg, "launch_stack",
+                                  template=new_template,
+                                  template_url=template_url,
+                                  disable_rollback=disable_rollback,
+                                  environment=environment, files=new_files,
+                                  parameters=parameters,
+                                  timeout_mins=timeout_mins)
+        mgr.api.method_put.assert_called_once_with(uri, body=expected)
+
+    def test_mgr_update_launch_metadata_server(self):
         sg = self.scaling_group
         mgr = sg.manager
         mgr.get = Mock(return_value=sg)
@@ -1185,14 +1353,14 @@ class AutoscaleTest(unittest.TestCase):
         pyclb.get = Mock(side_effect=Exception())
         self.assertRaises(exc.InvalidLoadBalancer, mgr._resolve_lbs, "bogus")
 
-    def test_mgr_create_body(self):
+    def test_mgr_create_body_server(self):
         sg = self.scaling_group
         mgr = sg.manager
         name = utils.random_unicode()
         cooldown = utils.random_unicode()
         min_entities = utils.random_unicode()
         max_entities = utils.random_unicode()
-        launch_config_type = utils.random_unicode()
+        launch_config_type = "launch_server"
         flavor = utils.random_unicode()
         disk_config = None
         metadata = None
@@ -1230,23 +1398,78 @@ class AutoscaleTest(unittest.TestCase):
                 "scalingPolicies": []}
 
         self.maxDiff = 1000000
-        ret = mgr._create_body(name, cooldown, min_entities, max_entities,
-                launch_config_type, server_name, image, flavor,
-                disk_config=disk_config, metadata=metadata,
-                personality=personality, networks=networks,
-                load_balancers=load_balancers,
-                scaling_policies=scaling_policies,
-                group_metadata=group_metadata, key_name=key_name)
+        ret = mgr._create_body(name, cooldown, min_entities,
+                               max_entities, launch_config_type,
+                               server_name=server_name, image=image,
+                               flavor=flavor, disk_config=disk_config,
+                               metadata=metadata,
+                               personality=personality,
+                               networks=networks,
+                               load_balancers=load_balancers,
+                               scaling_policies=scaling_policies,
+                               group_metadata=group_metadata,
+                               key_name=key_name)
         self.assertEqual(ret, expected)
 
-    def test_mgr_create_body_disk_config(self):
+    def test_mgr_create_body_stack(self):
         sg = self.scaling_group
         mgr = sg.manager
         name = utils.random_unicode()
         cooldown = utils.random_unicode()
         min_entities = utils.random_unicode()
         max_entities = utils.random_unicode()
-        launch_config_type = utils.random_unicode()
+        template = utils.random_unicode()
+        template_url = utils.random_unicode()
+        disable_rollback = utils.random_unicode()
+        environment = utils.random_unicode()
+        files = utils.random_unicode()
+        parameters = utils.random_unicode()
+        timeout_mins = utils.random_unicode()
+        group_metadata = utils.random_unicode()
+        expected = {
+            "groupConfiguration": {
+                "cooldown": cooldown,
+                "maxEntities": max_entities,
+                "minEntities": min_entities,
+                "name": name,
+                "metadata": group_metadata},
+            "launchConfiguration": {
+                "type": "launch_stack",
+                "args": {
+                    "stack": {
+                        "template": template,
+                        "template_url": template_url,
+                        "disable_rollback": disable_rollback,
+                        "environment": environment,
+                        "files": files,
+                        "parameters": parameters,
+                        "timeout_mins": timeout_mins,
+                    }
+                },
+            },
+            "scalingPolicies": []
+        }
+
+        self.maxDiff = 1000000
+        ret = mgr._create_body(name, cooldown, min_entities,
+                               max_entities, "launch_stack",
+                               group_metadata=group_metadata,
+                               template=template,
+                               template_url=template_url,
+                               disable_rollback=disable_rollback,
+                               environment=environment, files=files,
+                               parameters=parameters,
+                               timeout_mins=timeout_mins)
+        self.assertEqual(ret, expected)
+
+    def test_mgr_create_body_server_disk_config(self):
+        sg = self.scaling_group
+        mgr = sg.manager
+        name = utils.random_unicode()
+        cooldown = utils.random_unicode()
+        min_entities = utils.random_unicode()
+        max_entities = utils.random_unicode()
+        launch_config_type = "launch_server"
         flavor = utils.random_unicode()
         disk_config = utils.random_unicode()
         metadata = None
@@ -1283,13 +1506,14 @@ class AutoscaleTest(unittest.TestCase):
                 "scalingPolicies": []}
 
         self.maxDiff = 1000000
-        ret = mgr._create_body(name, cooldown, min_entities, max_entities,
-                launch_config_type, server_name, image, flavor,
-                disk_config=disk_config, metadata=metadata,
-                personality=personality, networks=networks,
-                load_balancers=load_balancers,
-                scaling_policies=scaling_policies,
-                group_metadata=group_metadata, key_name=key_name)
+        ret = mgr._create_body(name, cooldown, min_entities,
+                               max_entities, launch_config_type,
+                               group_metadata=group_metadata,
+                               server_name=server_name, image=image, flavor=flavor,
+                               disk_config=disk_config, metadata=metadata,
+                               personality=personality, networks=networks,
+                               load_balancers=load_balancers,
+                               scaling_policies=scaling_policies, key_name=key_name)
         self.assertEqual(ret, expected)
 
     def test_policy_init(self):
@@ -1524,12 +1748,12 @@ class AutoscaleTest(unittest.TestCase):
         clt.get_launch_config(sg)
         mgr.get_launch_config.assert_called_once_with(sg)
 
-    def test_clt_replace_launch_config(self):
+    def test_clt_replace_launch_config_server(self):
         clt = fakes.FakeAutoScaleClient()
         mgr = clt._manager
         sg = self.scaling_group
         mgr.replace_launch_config = Mock()
-        launch_config_type = utils.random_unicode()
+        launch_config_type = 'launch_server'
         server_name = utils.random_unicode()
         image = utils.random_unicode()
         flavor = utils.random_unicode()
@@ -1541,19 +1765,61 @@ class AutoscaleTest(unittest.TestCase):
         key_name = utils.random_unicode()
         userdata = utils.random_unicode()
         config_drive = utils.random_unicode()
-        clt.replace_launch_config(sg, launch_config_type, server_name, image,
-                flavor, disk_config=disk_config, metadata=metadata,
-                personality=personality, networks=networks,
-                load_balancers=load_balancers, key_name=key_name,
-                user_data=userdata, config_drive=config_drive)
+        clt.replace_launch_config(sg, launch_config_type,
+                                  server_name=server_name,
+                                  image=image, flavor=flavor,
+                                  disk_config=disk_config,
+                                  metadata=metadata,
+                                  personality=personality,
+                                  networks=networks,
+                                  load_balancers=load_balancers,
+                                  key_name=key_name,
+                                  user_data=userdata,
+                                  config_drive=config_drive)
         mgr.replace_launch_config.assert_called_once_with(sg,
-                launch_config_type, server_name, image, flavor,
-                disk_config=disk_config, metadata=metadata,
-                personality=personality, networks=networks,
-                load_balancers=load_balancers, key_name=key_name,
-                user_data=userdata, config_drive=config_drive)
+                                                          launch_config_type,
+                                                          server_name=server_name,
+                                                          image=image,
+                                                          flavor=flavor,
+                                                          disk_config=disk_config,
+                                                          metadata=metadata,
+                                                          personality=personality,
+                                                          networks=networks,
+                                                          load_balancers=load_balancers,
+                                                          key_name=key_name,
+                                                          user_data=userdata,
+                                                          config_drive=config_drive)
 
-    def test_clt_update_launch_config(self):
+    def test_clt_replace_launch_config_stack(self):
+        clt = fakes.FakeAutoScaleClient()
+        mgr = clt._manager
+        sg = self.scaling_group
+        mgr.replace_launch_config = Mock()
+        launch_config_type = 'launch_stack'
+        template = utils.random_unicode()
+        template_url = utils.random_unicode()
+        disable_rollback = utils.random_unicode()
+        environment = utils.random_unicode()
+        files = utils.random_unicode()
+        parameters = utils.random_unicode()
+        timeout_mins = utils.random_unicode()
+        clt.replace_launch_config(sg, launch_config_type,
+                                  template=template,
+                                  template_url=template_url,
+                                  disable_rollback=disable_rollback,
+                                  environment=environment, files=files,
+                                  parameters=parameters,
+                                  timeout_mins=timeout_mins)
+        mgr.replace_launch_config.assert_called_once_with(
+            sg, launch_config_type,
+            template=template,
+            template_url=template_url,
+            disable_rollback=disable_rollback,
+            environment=environment, files=files,
+            parameters=parameters,
+            timeout_mins=timeout_mins)
+
+    def test_clt_update_launch_config_server(self):
         clt = fakes.FakeAutoScaleClient()
         mgr = clt._manager
         sg = self.scaling_group
@@ -1569,19 +1835,62 @@ class AutoscaleTest(unittest.TestCase):
         key_name = utils.random_unicode()
         user_data = utils.random_unicode()
         config_drive = utils.random_unicode()
-        clt.update_launch_config(sg, server_name=server_name, flavor=flavor,
-                image=image, disk_config=disk_config, metadata=metadata,
-                personality=personality, networks=networks,
-                load_balancers=load_balancers, key_name=key_name,
-                config_drive=config_drive, user_data=user_data)
+        clt.update_launch_config(sg,
+                                 "launch_server",
+                                 server_name=server_name,
+                                 flavor=flavor, image=image,
+                                 disk_config=disk_config,
+                                 metadata=metadata,
+                                 personality=personality,
+                                 networks=networks,
+                                 load_balancers=load_balancers,
+                                 key_name=key_name,
+                                 config_drive=config_drive,
+                                 user_data=user_data)
         mgr.update_launch_config.assert_called_once_with(sg,
-                server_name=server_name, flavor=flavor, image=image,
-                disk_config=disk_config, metadata=metadata,
-                personality=personality, networks=networks,
-                load_balancers=load_balancers, key_name=key_name,
-                config_drive=config_drive, user_data=user_data)
+                                                         "launch_server",
+                                                         server_name=server_name,
+                                                         flavor=flavor,
+                                                         image=image,
+                                                         disk_config=disk_config,
+                                                         metadata=metadata,
+                                                         personality=personality,
+                                                         networks=networks,
+                                                         load_balancers=load_balancers,
+                                                         key_name=key_name,
+                                                         config_drive=config_drive,
+                                                         user_data=user_data)
 
-    def test_clt_update_launch_metadata(self):
+    def test_clt_update_launch_config_stack(self):
+        clt = fakes.FakeAutoScaleClient()
+        mgr = clt._manager
+        sg = self.scaling_group
+        mgr.update_launch_config = Mock()
+        template = utils.random_unicode()
+        template_url = utils.random_unicode()
+        disable_rollback = utils.random_unicode()
+        environment = utils.random_unicode()
+        files = utils.random_unicode()
+        parameters = utils.random_unicode()
+        timeout_mins = utils.random_unicode()
+        clt.update_launch_config(sg,
+                                 "launch_stack",
+                                 template=template,
+                                 template_url=template_url,
+                                 disable_rollback=disable_rollback,
+                                 environment=environment, files=files,
+                                 parameters=parameters,
+                                 timeout_mins=timeout_mins)
+        mgr.update_launch_config.assert_called_once_with(
+            sg, "launch_stack",
+            template=template,
+            template_url=template_url,
+            disable_rollback=disable_rollback,
+            environment=environment, files=files,
+            parameters=parameters,
+            timeout_mins=timeout_mins)
+
+    def test_clt_update_launch_metadata_server(self):
         clt = fakes.FakeAutoScaleClient()
         mgr = clt._manager
         sg = self.scaling_group
