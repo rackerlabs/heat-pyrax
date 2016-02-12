@@ -25,7 +25,6 @@ import pyrax.exceptions as exc
 from pyrax.manager import BaseManager
 from pyrax.resource import BaseResource
 import pyrax.utils as utils
-from webob.datetime_utils import minute
 
 
 def assure_instance(fnc):
