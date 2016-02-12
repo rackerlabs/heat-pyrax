@@ -676,7 +676,6 @@ class CloudDatabaseSchedule(BaseResource):
     """
     This class represents a scheduled backup
     """
-    get_details = True
 
 
 class CloudDatabaseScheduleManager(BaseManager):

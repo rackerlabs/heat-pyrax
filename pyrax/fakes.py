@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
 import os
-import mock
 import random
 import time
 import uuid
@@ -243,7 +242,6 @@ class FakeBulkDeleter(BulkDeleter):
 class FakeManager(object):
     def __init__(self, *args, **kwargs):
         super(FakeManager, self).__init__(*args, **kwargs)
-        self._update = mock.Mock()
         self.api = FakeClient()
 
     def list(self):
