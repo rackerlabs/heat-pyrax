@@ -6,15 +6,14 @@ import unittest
 from mock import patch
 from mock import MagicMock as Mock
 
-from pyrax.clouddatabases import CloudDatabaseBackupManager
 from pyrax.clouddatabases import CloudDatabaseDatabase
 from pyrax.clouddatabases import CloudDatabaseFlavor
 from pyrax.clouddatabases import CloudDatabaseInstance
+from pyrax.clouddatabases import CloudDatabaseScheduleManager
 from pyrax.clouddatabases import CloudDatabaseUser
 from pyrax.clouddatabases import CloudDatabaseVolume
 from pyrax.clouddatabases import assure_instance
 import pyrax.exceptions as exc
-from pyrax.resource import BaseResource
 import pyrax.utils as utils
 
 from pyrax import fakes
@@ -920,6 +919,39 @@ class CloudDatabasesTest(unittest.TestCase):
                 "users": [],
                 "datastore": {"type": "MariaDB", "version": "10"}}}
         self.assertEqual(ret, expected)
+
+    @patch("pyrax.manager.BaseManager", new=fakes.FakeManager)
+    def test_create_body_schedule(self):
+        exp_id = utils.random_unicode()
+        expected = {
+            "schedule": {
+                "action": 'backup',
+                "day_of_week": 3,
+                "hour": 12,
+                "minute": 0,
+                "source_id": exp_id,
+                "source_type": "instance",
+                "full_backup_retention": True
+            }
+        }
+        ret = self.client._schedule_manager._create_body(None, exp_id,
+            day_of_week=3, hour=12, full_backup_retention=True)
+        self.assertEqual(expected, ret)
+
+    def test_update_schedule(self):
+        schedule = utils.random_unicode()
+        run_now = True
+        minute = 5
+        with patch.object(self.client._schedule_manager, "_update") as mupdate:
+            self.client.update_schedule(schedule, run_now=run_now, minute=minute)
+            body = {
+                "schedule": {
+                    "run_now": run_now,
+                    "minute": minute
+                }
+            }
+            uri = "/schedules/%s" % schedule
+            mupdate.assert_called_once_with(uri, body)
 
 
 if __name__ == "__main__":
