@@ -624,7 +624,7 @@ class CloudDatabaseHAInstanceManager(BaseManager):
     def delete_acl(self, ha_instance, cidr):
         self.api.method_delete("%s/%s" % (self._acls_uri(ha_instance), cidr))
 
-    def add_replica(self, ha_instance, name, volume_size, flavor):
+    def create_replica(self, ha_instance, name, volume_size, flavor):
         body = {
             "replica_details": {
                 "volume": {
@@ -926,6 +926,9 @@ class CloudDatabaseClient(BaseClient):
     def list_ha_instances(self, limit=None, marker=None):
         return self._ha_manager.list(limit=limit, marker=marker)
 
+    def get_ha_instance(self, instance):
+        return self._ha_manager.get(instance)
+
     def create_ha_instance(self, name, datastore_type, datastore_version,
                            replicas, source_name, source_vol_size,
                            source_flavor, networks=[], acls=[]):
@@ -944,7 +947,7 @@ class CloudDatabaseClient(BaseClient):
         return self._ha_manager.create(name, datastore, replica_source,
                                        replicas, networks=networks, acls=acls)
 
-    def delet_ha_instance(self, ha_instance):
+    def delete_ha_instance(self, ha_instance):
         self._ha_manager.delete(ha_instance)
 
     def create_ha_acl(self, ha_instance, cidr):
@@ -954,7 +957,8 @@ class CloudDatabaseClient(BaseClient):
         self._ha_manager.delete_acl(ha_instance, cidr)
 
     def create_ha_replica(self, ha_instance, name, volume_size, flavor):
-        self._ha_manager.add_replica(ha_instance, name, volume_size, flavor)
+        self._ha_manager.create_replica(ha_instance, name, volume_size,
+                                        flavor)
 
     def delete_ha_replica(self, ha_instance, replica_instance):
         self._ha_manager.remove_replica(ha_instance, replica_instance)
