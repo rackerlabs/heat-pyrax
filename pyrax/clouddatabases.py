@@ -583,6 +583,69 @@ class CloudDatabaseInstance(BaseResource):
     flavor = property(_get_flavor, _set_flavor)
 
 
+class CloudDatabaseHAInstance(BaseResource):
+    pass
+
+
+class CloudDatabaseHAInstanceManager(BaseManager):
+
+    def __init__(self, api):
+        super(CloudDatabaseHAInstanceManager, self).__init__(api,
+            resource_class=CloudDatabaseHAInstance,
+            response_key="ha_instance",
+            uri_base="ha")
+
+    def _create_body(self, name, datastore, replica_source, replicas,
+                     networks=[], acls=[]):
+        return {
+            "ha": {
+                "name": name,
+                "datastore": datastore,
+                "replica_source": replica_source,
+                "replicas": replicas,
+                "networks": networks,
+                "acls": acls
+            }
+        }
+
+    def _acls_uri(self, ha_instance):
+        return "/%s/%s/acls" % (self.uri_base, utils.get_id(ha_instance))
+
+    def list_acls(self, ha_instance):
+        uri = self._acls_uri(ha_instance)
+        body = self.api.method_get(uri)[1]
+        data = self._data_from_response(body, key="acls")
+        return [d['address'] for d in data]
+
+    def create_acl(self, ha_instance, cidr):
+        uri = self._acls_uri(ha_instance)
+        self.api.method_post(uri, body={'address': cidr})
+
+    def delete_acl(self, ha_instance, cidr):
+        self.api.method_delete("%s/%s" % (self._acls_uri(ha_instance), cidr))
+
+    def add_replica(self, ha_instance, name, volume_size, flavor):
+        body = {
+            "replica_details": {
+                "volume": {
+                    "size": volume_size
+                },
+                "flavorRef": flavor,
+                "name": name
+            }
+        }
+        self.action(ha_instance, "add_replica", body)
+
+    def remove_replica(self, ha_instance, replica):
+        self.action(ha_instance, "remove_replica", utils.get_id(replica))
+
+    def resize_volumes(self, ha_instance, size):
+        self.action(ha_instance, "resize_volumes", {"size": size})
+
+    def resize_flavor(self, ha_instance, flavor):
+        self.action(ha_instance, "resize_flavor", flavor)
+
+
 class CloudDatabaseDatabase(BaseResource):
     """
     This class represents a database on a CloudDatabaseInstance. It is not
@@ -747,6 +810,7 @@ class CloudDatabaseClient(BaseClient):
                 resource_class=CloudDatabaseBackup, response_key="backup",
                 uri_base="backups")
         self._schedule_manager = CloudDatabaseScheduleManager(self)
+        self._ha_manager = CloudDatabaseHAInstanceManager(self)
 
 
     @assure_instance
@@ -858,6 +922,54 @@ class CloudDatabaseClient(BaseClient):
         on the specified instance.
         """
         return instance.revoke_user_access(user, db_names, strict=strict)
+
+    def list_ha_instances(self, limit=None, marker=None):
+        return self._ha_manager.list(limit=limit, marker=marker)
+
+    def create_ha_instance(self, name, datastore_type, datastore_version,
+                           replicas, source_name, source_vol_size,
+                           source_flavor, networks=[], acls=[]):
+
+        replica_source = [{
+            "name": source_name,
+            "flavor_ref": source_flavor,
+            "volume": {
+                "size": source_vol_size
+            }
+        }]
+        datastore = {
+            "type": datastore_type,
+            "version": datastore_version
+        }
+        return self._ha_manager.create(name, datastore, replica_source,
+                                       replicas, networks=networks, acls=acls)
+
+    def delet_ha_instance(self, ha_instance):
+        self._ha_manager.delete(ha_instance)
+
+    def create_ha_acl(self, ha_instance, cidr):
+        self._ha_manager.create_acl(ha_instance, cidr)
+
+    def delete_ha_acl(self, ha_instance, cidr):
+        self._ha_manager.delete_acl(ha_instance, cidr)
+
+    def create_ha_replica(self, ha_instance, name, volume_size, flavor):
+        self._ha_manager.add_replica(ha_instance, name, volume_size, flavor)
+
+    def delete_ha_replica(self, ha_instance, replica_instance):
+        self._ha_manager.remove_replica(ha_instance, replica_instance)
+
+    def resize_ha_volume(self, ha_instance, new_size):
+        ha = self._ha_manager.get(ha_instance)
+        cur_size = ha.volume['size']
+        if new_size <= cur_size:
+            raise exc.ClientException(code=400,
+                message=("New volume size must be greater than existing "
+                         "volume size (%s)") % cur_size)
+        self._ha_manager.resize_volumes(ha, new_size)
+
+    def resize_ha_flavor(self, ha_instance, new_flavor):
+        self._ha_manager.resize_flavor(ha_instance, new_flavor)
 
     def list_schedules(self, limit=None, marker=None):
         return self._schedule_manager.list(limit=limit, marker=marker)
