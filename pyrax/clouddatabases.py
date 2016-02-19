@@ -19,6 +19,7 @@
 from functools import wraps
 
 import six
+import urllib
 
 from pyrax.client import BaseClient
 import pyrax.exceptions as exc
@@ -622,6 +623,7 @@ class CloudDatabaseHAInstanceManager(BaseManager):
         self.api.method_post(uri, body={'address': cidr})
 
     def delete_acl(self, ha_instance, cidr):
+        cidr = urllib.quote(cidr, safe="")
         self.api.method_delete("%s/%s" % (self._acls_uri(ha_instance), cidr))
 
     def create_replica(self, ha_instance, name, volume_size, flavor):
