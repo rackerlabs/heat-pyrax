@@ -9,7 +9,6 @@ from mock import MagicMock as Mock
 from pyrax.clouddatabases import CloudDatabaseDatabase
 from pyrax.clouddatabases import CloudDatabaseFlavor
 from pyrax.clouddatabases import CloudDatabaseInstance
-from pyrax.clouddatabases import CloudDatabaseScheduleManager
 from pyrax.clouddatabases import CloudDatabaseUser
 from pyrax.clouddatabases import CloudDatabaseVolume
 from pyrax.clouddatabases import assure_instance
@@ -952,6 +951,137 @@ class CloudDatabasesTest(unittest.TestCase):
             }
             uri = "/schedules/%s" % schedule
             mupdate.assert_called_once_with(uri, body)
+
+    def test_ha_create_body(self):
+        expected = {
+            "ha": {
+                "datastore": {
+                    "version": "5.6",
+                    "type": "MYSQL"
+                },
+                "replicas": [{
+                    "volume": {
+                        "size": 1
+                    },
+                    "flavorRef": "2",
+                    "name": "source_replica1"
+                }],
+                "name":"ha-1",
+                "networks": [
+                     "servicenet",
+                     "publicnet"
+                ],
+                "acls": [{
+                    "address": "10.0.0.0/0"
+                }, {
+                    "address": "1.2.3.4/5"
+                }],
+                "replica_source": [{
+                    "volume": {
+                        "size": 1
+                    },
+                    "flavorRef": "2",
+                    "name": "source"
+                }]}}
+        exp_ds = {
+            "version": "5.6",
+            "type": "MYSQL"
+        }
+        exp_rs = [{
+            "volume": {
+                "size": 1
+            },
+            "flavorRef": "2",
+            "name": "source"
+        }]
+        exp_replicas = [{
+            "volume": {
+                "size": 1,
+            },
+            "flavorRef": "2",
+            "name": "source_replica1"
+        }]
+        exp_nw = ["servicenet", "publicnet"]
+        exp_acls = [{
+            "address": "10.0.0.0/0"
+        }, {
+            "address": "1.2.3.4/5"
+        }]
+        self.assertEqual(expected, self.client._ha_manager._create_body(
+            "ha-1", exp_ds, exp_rs, exp_replicas, networks=exp_nw,
+            acls=exp_acls))
+
+    def test_ha_add_acl(self):
+        with patch.object(self.client, "method_post") as mpost:
+            self.client.create_ha_acl("1234", "1.2.3.4/5")
+            mpost.assert_called_once_with("/ha/1234/acls",
+                                          body={'address': '1.2.3.4/5'})
+
+    def test_ha_del_acl(self):
+        with patch.object(self.client, "method_delete") as mdel:
+            self.client.delete_ha_acl("1234", "1.2.3.4/5")
+            mdel.assert_called_once_with("/ha/1234/acls/1.2.3.4/5")
+
+    def test_ha_add_replica(self):
+        expbody = {
+            "add_replica": {
+                "replica_details": {
+                    "volume": {
+                        "size": 4
+                    },
+                    "flavorRef": "2",
+                    "name": "test"
+                }
+            }
+        }
+        with patch.object(self.client, "method_post") as mpost:
+            self.client.create_ha_replica("1234", 'test', 4, "2")
+            mpost.assert_called_once_with("/ha/1234/action", body=expbody)
+
+    def test_ha_del_replica(self):
+        expbody = {
+            "remove_replica": "567890"
+        }
+        with patch.object(self.client, "method_post") as mpost:
+            self.client.delete_ha_replica("1234", "567890")
+            mpost.assert_called_once_with("/ha/1234/action", body=expbody)
+
+    def test_ha_resize_vol(self):
+        mha = Mock()
+        mha.id = '1234'
+        mha.volume = {'size': 1}
+        expbody = {
+            "resize_volumes": {
+                "size": 2
+            }
+        }
+        with patch.object(self.client._ha_manager, "get") as mget:
+            with patch.object(self.client, "method_post") as mpost:
+                mget.return_value = mha
+                self.client.resize_ha_volume('1234', 2)
+                mpost.assert_called_once_with("/ha/1234/action", body=expbody)
+
+    def test_ha_resize_vol_error(self):
+        mha = Mock()
+        mha.id = "1234"
+        mha.volume = { 'size': 3 }
+        with patch.object(self.client._ha_manager, "get") as mget:
+            with patch.object(self.client, "method_post") as mpost:
+                mget.return_value = mha
+                with self.assertRaises(exc.ClientException) as ex:
+                    self.client.resize_ha_volume('1234', 2)
+                    ermsg = ("New volume size must be greater than existing "
+                             "volume size (3)")
+                    self.assertIn(ermsg, str(ex.exception))
+                self.assertEqual(0, mpost.call_count)
+
+    def test_ha_resize_flavor(self):
+        expbody = {
+            "resize_flavor": "3"
+        }
+        with patch.object(self.client, "method_post") as mpost:
+            self.client.resize_ha_flavor("1234", "3")
+            mpost.assert_called_once_with("/ha/1234/action", body=expbody)
 
 
 if __name__ == "__main__":
