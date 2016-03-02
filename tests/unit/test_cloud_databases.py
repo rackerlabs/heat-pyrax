@@ -953,6 +953,7 @@ class CloudDatabasesTest(unittest.TestCase):
             mupdate.assert_called_once_with(uri, body)
 
     def test_ha_create_body(self):
+        self.maxDiff = None
         expected = {
             "ha": {
                 "datastore": {
@@ -1020,7 +1021,7 @@ class CloudDatabasesTest(unittest.TestCase):
     def test_ha_del_acl(self):
         with patch.object(self.client, "method_delete") as mdel:
             self.client.delete_ha_acl("1234", "1.2.3.4/5")
-            mdel.assert_called_once_with("/ha/1234/acls/1.2.3.4/5")
+            mdel.assert_called_once_with("/ha/1234/acls/1.2.3.4%2F5")
 
     def test_ha_add_replica(self):
         expbody = {

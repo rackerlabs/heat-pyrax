@@ -598,16 +598,19 @@ class CloudDatabaseHAInstanceManager(BaseManager):
 
     def _create_body(self, name, datastore, replica_source, replicas,
                      networks=[], acls=[]):
-        return {
+        body = {
             "ha": {
                 "name": name,
                 "datastore": datastore,
                 "replica_source": replica_source,
-                "replicas": replicas,
-                "networks": networks,
-                "acls": acls
+                "replicas": replicas
             }
         }
+        if networks:
+            body["ha"].update({"networks": networks})
+        if acls:
+            body["ha"].update({"acls": acls})
+        return body
 
     def _acls_uri(self, ha_instance):
         return "/%s/%s/acls" % (self.uri_base, utils.get_id(ha_instance))
@@ -937,7 +940,7 @@ class CloudDatabaseClient(BaseClient):
 
         replica_source = [{
             "name": source_name,
-            "flavor_ref": source_flavor,
+            "flavorRef": source_flavor,
             "volume": {
                 "size": source_vol_size
             }
